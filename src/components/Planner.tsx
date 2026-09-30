@@ -17,23 +17,27 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { useEffect, useMemo, useState } from "react";
-import { DEFAULT_SETTINGS, summarize, usd, type Feature, type Settings, type Tier } from "@/lib/cost";
+import { DEFAULT_SETTINGS, LABELS, MODE_DEFAULTS, summarize, usd, type Feature, type Mode, type Settings, type Tier } from "@/lib/cost";
 import { EXAMPLE_IDEA, EXAMPLE_PLAN } from "@/lib/example";
 import { MODELS, MODEL_BY_ID, PRICES_CHECKED, type ModelId, type ModelInfo } from "@/lib/models";
 import type { GeneratedPlan } from "@/lib/schema";
 import { CostPanel } from "./CostPanel";
 import { FeatureCard } from "./FeatureCard";
+import { ValueMatrix } from "./ValueMatrix";
 
 type Meta = { model: string; inputTokens: number; outputTokens: number; costUsd: number; ms: number };
 
-const STORAGE_KEY = "tier-planner:v1";
+const STORAGE_KEY = "tier-planner:v2";
 
-const COLUMNS: { tier: Tier; title: string; hint: string; tone: string }[] = [
-  { tier: "unassigned", title: "Backlog", hint: "Drag features into a tier", tone: "bg-slate-100/70" },
-  { tier: "free", title: "Free", hint: "Keep it cheap", tone: "bg-emerald-50/70" },
-  { tier: "premium", title: "Premium", hint: "Where the value is", tone: "bg-indigo-50/70" },
-  { tier: "later", title: "Not now", hint: "Out of scope for v1", tone: "bg-slate-50" },
-];
+function columns(mode: Mode): { tier: Tier; title: string; hint: string; tone: string }[] {
+  const L = LABELS[mode];
+  return [
+    { tier: "unassigned", title: "Backlog", hint: "Drag features into a plan", tone: "bg-slate-100/70" },
+    { tier: "free", title: L.free, hint: L.freeHint, tone: "bg-emerald-50/70" },
+    { tier: "premium", title: L.premium, hint: L.premiumHint, tone: "bg-indigo-50/70" },
+    { tier: "later", title: "Not now", hint: "Out of scope for v1", tone: "bg-slate-50" },
+  ];
+}
 
 function toFeatures(plan: GeneratedPlan): Feature[] {
   return plan.features.map((f) => ({
@@ -50,7 +54,9 @@ type Saved = { idea?: string; appName?: string; features?: Feature[]; settings?:
 function readSaved(): Saved | null {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null");
-    return saved?.features?.length ? saved : null;
+    // Ignore saved plans from older versions that lack value/risk fields.
+    const ok = saved?.features?.length && saved.features.every((f: Feature) => typeof f.customerValue === "number");
+    return ok ? saved : null;
   } catch {
     return null;
   }
@@ -116,7 +122,7 @@ export function Planner() {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idea }),
+        body: JSON.stringify({ idea, mode: settings.mode }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Something went wrong.");
@@ -130,7 +136,12 @@ export function Planner() {
     }
   }
 
+  function setMode(mode: Mode) {
+    setSettings((s) => ({ ...s, mode, ...MODE_DEFAULTS[mode] }));
+  }
+
   function loadExample() {
+    setMode("b2b");
     setIdea(EXAMPLE_IDEA);
     setAppName(EXAMPLE_PLAN.appName);
     setFeatures(toFeatures(EXAMPLE_PLAN));
@@ -157,6 +168,10 @@ export function Planner() {
         batchable: false,
         suggestedModel: "claude-sonnet-5-5",
         rationale: "Added by hand.",
+        customerValue: 3,
+        valueReason: "Describe the customer outcome.",
+        riskIfWrong: "medium",
+        riskNote: "Describe what happens if it's wrong.",
         tier: "unassigned",
         model: null,
       },
@@ -169,13 +184,33 @@ export function Planner() {
     <div className="mx-auto w-full max-w-[1440px] px-4 pb-16 sm:px-6">
       {/* Step 1 */}
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-        <StepLabel n={1} text="Describe the app you want to build" />
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <StepLabel n={1} text="Describe the customer, their problem and the product" />
+          <div role="radiogroup" aria-label="Business model" className="flex rounded-lg bg-slate-100 p-0.5 text-xs font-medium">
+            {(["b2b", "consumer"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                role="radio"
+                aria-checked={settings.mode === m}
+                onClick={() => setMode(m)}
+                className={`rounded-md px-3 py-1 ${settings.mode === m ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
+              >
+                {m === "b2b" ? "B2B · per seat" : "Consumer · freemium"}
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="mt-1 text-xs text-slate-500">
+          Good input names <b>who pays</b>, <b>the problem they have today</b> and <b>what the product changes</b>. Claude scores each feature for
+          customer value and risk, not just cost.
+        </p>
         <textarea
           value={idea}
           onChange={(e) => setIdea(e.target.value)}
           maxLength={600}
           rows={3}
-          placeholder="e.g. An AI assistant for staffing agencies that helps dispatchers fill shifts…"
+          placeholder="e.g. Staffing agencies (who pays) lose hours every day matching temp workers to customer orders by phone and checking pay rules by hand (problem). An AI assistant that reads orders, suggests workers and drafts offers (product)."
           className="mt-2 w-full resize-y rounded-xl border border-slate-200 bg-slate-50/50 p-3 text-sm outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
         />
         <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -209,7 +244,7 @@ export function Planner() {
       {features.length > 0 && (
         <DndContext sensors={sensors} collisionDetection={collision} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setActive(null)}>
           <div className="mt-6 flex flex-wrap items-baseline gap-x-3">
-            <StepLabel n={2} text="Drag features into Free or Premium" />
+            <StepLabel n={2} text={`Drag features into ${LABELS[settings.mode].free} or ${LABELS[settings.mode].premium}`} />
             {appName && <span className="text-sm font-medium text-slate-500">{appName} · {features.length} features</span>}
           </div>
 
@@ -234,7 +269,7 @@ export function Planner() {
           <div className="mt-4 grid gap-4 xl:grid-cols-[1fr_330px]">
             <div>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {COLUMNS.map((c) => (
+                {columns(settings.mode).map((c) => (
                   <Column key={c.tier} {...c} features={features.filter((f) => f.tier === c.tier)} settings={settings}>
                     {features
                       .filter((f) => f.tier === c.tier)
@@ -245,11 +280,13 @@ export function Planner() {
                           settings={settings}
                           onChange={(p) => update(f.id, p)}
                           onRemove={() => setFeatures((fs) => fs.filter((x) => x.id !== f.id))}
+                          unit={LABELS[settings.mode].user}
                         />
                       ))}
                   </Column>
                 ))}
               </div>
+              <ValueMatrix features={features} settings={settings} />
             </div>
             <div className="xl:sticky xl:top-20 xl:self-start">
               <CostPanel summary={summary} settings={settings} onSettings={(p) => setSettings((s) => ({ ...s, ...p }))} />
@@ -355,35 +392,38 @@ function ChipBody({ model, lifted }: { model: ModelInfo; lifted?: boolean }) {
 
 function HowItWorks() {
   return (
-    <section className="mt-10 grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-700 shadow-sm md:grid-cols-3">
-      <div>
-        <h3 className="font-semibold text-slate-900">How it works</h3>
-        <p className="mt-1 text-xs leading-relaxed">
-          One call to Claude Opus 5.5 at <i>low effort</i> turns your idea into features, using <b>structured outputs</b> (a JSON schema) so the
-          result is always valid. The system prompt is frozen, so it stays <b>cacheable</b>, and <b>server-side fallback</b> covers the rare refusal.
-          Everything after that (tiers, models, pricing) is plain code running in your browser.
-        </p>
-      </div>
-      <div>
-        <h3 className="font-semibold text-slate-900">The cost model</h3>
-        <p className="mt-1 text-xs leading-relaxed">
-          Per feature: calls × (fresh input × input price + cached input × cache-read price + output × output price). Batchable features get 50% off
-          with the Batch API. Premium users get Free features too. Cache-write premiums and infrastructure are left out.
-        </p>
-      </div>
-      <div>
-        <h3 className="font-semibold text-slate-900">Prices</h3>
-        <p className="mt-1 text-xs leading-relaxed">
-          Claude API list prices in USD per 1M tokens, checked {PRICES_CHECKED}:{" "}
-          {MODELS.filter((m) => m.id !== "none").map((m, i) => (
-            <span key={m.id}>
-              {i > 0 && ", "}
-              {m.short} ${m.input}/${m.output}
-            </span>
-          ))}
-          . Token estimates are Claude&rsquo;s guesses; edit them under &ldquo;Details&rdquo;.
-        </p>
+    <section className="mt-10 rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-700 shadow-sm">
+      <h2 className="font-semibold text-slate-900">How I decide what goes in an AI product</h2>
+      <div className="mt-3 grid gap-4 md:grid-cols-4">
+        <Principle n="1" title="Value">
+          Start from the paying customer&rsquo;s problem. A feature earns its place by an outcome they&rsquo;d pay for: time saved, errors
+          avoided, revenue. Features that are a reason to buy go into the paid plan.
+        </Principle>
+        <Principle n="2" title="Quality">
+          Where a wrong answer causes legal or financial harm, the model is chosen by evals on real cases, with a human approving the output.
+          Rules that can be code stay code.
+        </Principle>
+        <Principle n="3" title="Cost">
+          Only then pick the cheapest model that passes. AI features cost money on every use, so each one needs a cost per user that the
+          pricing covers, with caching and batching where they fit.
+        </Principle>
+        <Principle n="4" title="How this tool works">
+          One call to Claude Opus 5.5 at low effort drafts the features, using a JSON schema (structured outputs), a frozen system prompt that can
+          be cached, and server-side fallback. Everything after that is plain code in your browser. Prices checked {PRICES_CHECKED}.
+        </Principle>
       </div>
     </section>
+  );
+}
+
+function Principle({ n, title, children }: { n: string; title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <h3 className="flex items-center gap-2 font-semibold text-slate-900">
+        <span className="text-xs font-semibold text-indigo-600">{n}</span>
+        {title}
+      </h3>
+      <p className="mt-1 text-xs leading-relaxed">{children}</p>
+    </div>
   );
 }

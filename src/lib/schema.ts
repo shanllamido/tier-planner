@@ -13,6 +13,10 @@ export const GeneratedFeature = z.object({
   batchable: z.boolean(),
   suggestedModel: z.enum(MODEL_IDS),
   rationale: z.string().max(240),
+  customerValue: z.number().int().min(1).max(5),
+  valueReason: z.string().max(240),
+  riskIfWrong: z.enum(["low", "medium", "high"]),
+  riskNote: z.string().max(240),
 });
 
 export const GeneratedPlan = z.object({
@@ -45,6 +49,10 @@ export const PLAN_JSON_SCHEMA = {
           "batchable",
           "suggestedModel",
           "rationale",
+          "customerValue",
+          "valueReason",
+          "riskIfWrong",
+          "riskNote",
         ],
         properties: {
           name: { type: "string", description: "2-5 words" },
@@ -57,6 +65,10 @@ export const PLAN_JSON_SCHEMA = {
           batchable: { type: "boolean", description: "True if results can arrive minutes later, so the Batch API applies" },
           suggestedModel: { type: "string", enum: [...MODEL_IDS] },
           rationale: { type: "string", description: "One short sentence on why this model" },
+          customerValue: { type: "integer", description: "1-5: how much this feature is worth to the paying customer (5 = a reason to buy)" },
+          valueReason: { type: "string", description: "One short sentence: the customer outcome, ideally measurable (time saved, errors avoided, revenue)" },
+          riskIfWrong: { type: "string", enum: ["low", "medium", "high"], description: "Harm if the feature gives a wrong answer: legal, financial or safety impact is high" },
+          riskNote: { type: "string", description: "One short sentence: what goes wrong if the output is wrong, and how to guard against it" },
         },
       },
     },

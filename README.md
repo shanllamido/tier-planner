@@ -1,10 +1,11 @@
 # Tier Planner
 
-Plan an AI product's Free and Premium tiers and see the Claude model costs live.
+Decide what goes into an AI product and how to sell it: **value first, then quality, then cost.**
 
-1. **Describe the app.** One call to Claude turns the idea into 8–14 features with usage estimates.
-2. **Drag features** into Free, Premium or Not now.
-3. **Drag a Claude model** (or "No LLM") onto each feature. Cost per user, Premium margin, break-even and the monthly bill update as you go.
+1. **Describe the customer, their problem and the product**, and pick a business model (B2B per seat, or consumer freemium). One call to Claude turns it into 8–14 features, each with a customer-value score (1–5), a risk-if-wrong rating and usage estimates.
+2. **Drag features** into the plans: Core / AI Add-on for B2B, or Free / Premium for consumer.
+3. **Drag a Claude model** (or "No LLM") onto each feature. Cost per seat, add-on margin and the monthly bill update as you go.
+4. **Check** the value-vs-cost chart (quick wins, worth paying for, cut or simplify) and the list of features that need evals and human review before launch.
 
 ## Design choices
 

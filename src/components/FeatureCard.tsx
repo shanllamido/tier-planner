@@ -2,7 +2,7 @@
 
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { useState } from "react";
-import { callCost, featureMonthly, usd, type Feature, type Settings, type Tier } from "@/lib/cost";
+import { callCost, featureMonthly, usd, type Feature, type Risk, type Settings, type Tier, LABELS } from "@/lib/cost";
 import { MODELS, MODEL_BY_ID, type ModelId } from "@/lib/models";
 
 type Props = {
@@ -11,16 +11,20 @@ type Props = {
   onChange: (patch: Partial<Feature>) => void;
   onRemove: () => void;
   overlay?: boolean;
+  unit?: string;
 };
 
-const TIER_OPTIONS: { value: Tier; label: string }[] = [
-  { value: "unassigned", label: "Backlog" },
-  { value: "free", label: "Free" },
-  { value: "premium", label: "Premium" },
-  { value: "later", label: "Not now" },
-];
+function tierOptions(s: Settings): { value: Tier; label: string }[] {
+  const L = LABELS[s.mode];
+  return [
+    { value: "unassigned", label: "Backlog" },
+    { value: "free", label: L.free },
+    { value: "premium", label: L.premium },
+    { value: "later", label: "Not now" },
+  ];
+}
 
-export function FeatureCard({ feature: f, settings, onChange, onRemove, overlay }: Props) {
+export function FeatureCard({ feature: f, settings, onChange, onRemove, overlay, unit = "user" }: Props) {
   const [open, setOpen] = useState(false);
   const drag = useDraggable({ id: `feature:${f.id}`, data: { kind: "feature", featureId: f.id } });
   const drop = useDroppable({ id: `slot:${f.id}`, data: { accepts: "model", featureId: f.id } });
@@ -68,6 +72,26 @@ export function FeatureCard({ feature: f, settings, onChange, onRemove, overlay 
             </span>
           </div>
           <p className="mt-1 text-xs leading-relaxed text-slate-600">{f.description}</p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="flex items-center gap-1 text-[10px] text-slate-500" title={f.valueReason}>
+              Value
+              <span className="flex gap-0.5" aria-label={`Customer value ${f.customerValue} of 5`}>
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <span key={i} className={`h-1.5 w-1.5 rounded-full ${i <= f.customerValue ? "bg-indigo-600" : "bg-slate-200"}`} />
+                ))}
+              </span>
+            </span>
+            {f.needsLLM && f.riskIfWrong !== "low" && (
+              <span
+                title={f.riskNote}
+                className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+                  f.riskIfWrong === "high" ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-800"
+                }`}
+              >
+                {f.riskIfWrong === "high" ? "High risk if wrong" : "Medium risk"}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -82,7 +106,7 @@ export function FeatureCard({ feature: f, settings, onChange, onRemove, overlay 
           <span className="text-xs text-slate-400">Drop a model here</span>
         )}
         <span className={`text-xs tabular-nums ${model ? "font-semibold text-slate-800" : "text-slate-400"}`}>
-          {model ? `${usd(monthly)}/user/mo` : "—"}
+          {model ? `${usd(monthly)}/${unit}/mo` : "—"}
         </span>
       </div>
 
@@ -104,7 +128,9 @@ export function FeatureCard({ feature: f, settings, onChange, onRemove, overlay 
 
       {open && !overlay && (
         <div className="mt-2 space-y-2 border-t border-slate-100 pt-2 text-xs">
-          <p className="italic text-slate-500">{f.rationale}</p>
+          <p className="text-slate-700"><b>Value:</b> {f.valueReason}</p>
+          {f.needsLLM && <p className="text-slate-700"><b>If wrong:</b> {f.riskNote}</p>}
+          <p className="text-slate-500"><b>Model:</b> {f.rationale}</p>
           <div className="grid grid-cols-2 gap-2">
             <label className="col-span-2 flex flex-col gap-0.5">
               <span className="text-slate-500">Tier</span>
@@ -113,7 +139,7 @@ export function FeatureCard({ feature: f, settings, onChange, onRemove, overlay 
                 onChange={(e) => onChange({ tier: e.target.value as Tier })}
                 className="rounded border border-slate-200 bg-white px-1.5 py-1"
               >
-                {TIER_OPTIONS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                {tierOptions(settings).map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
             </label>
             <label className="col-span-2 flex flex-col gap-0.5">
@@ -127,7 +153,29 @@ export function FeatureCard({ feature: f, settings, onChange, onRemove, overlay 
                 {MODELS.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
               </select>
             </label>
-            <NumberField label="Calls / user / mo" value={f.callsPerUserMonth} onChange={(v) => onChange({ callsPerUserMonth: v })} />
+            <label className="flex flex-col gap-0.5">
+              <span className="text-slate-500">Customer value</span>
+              <select
+                value={f.customerValue}
+                onChange={(e) => onChange({ customerValue: Number(e.target.value) })}
+                className="rounded border border-slate-200 bg-white px-1.5 py-1"
+              >
+                {[5, 4, 3, 2, 1].map((v) => <option key={v} value={v}>{v} / 5</option>)}
+              </select>
+            </label>
+            <label className="flex flex-col gap-0.5">
+              <span className="text-slate-500">Risk if wrong</span>
+              <select
+                value={f.riskIfWrong}
+                onChange={(e) => onChange({ riskIfWrong: e.target.value as Risk })}
+                className="rounded border border-slate-200 bg-white px-1.5 py-1"
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </label>
+            <NumberField label={`Calls / ${unit} / mo`} value={f.callsPerUserMonth} onChange={(v) => onChange({ callsPerUserMonth: v })} />
             <NumberField label="Input tokens / call" value={f.inputTokens} onChange={(v) => onChange({ inputTokens: v })} />
             <NumberField label="Output tokens / call" value={f.outputTokens} onChange={(v) => onChange({ outputTokens: v })} />
             <div className="flex flex-col justify-end gap-1">

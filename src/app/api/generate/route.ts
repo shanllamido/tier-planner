@@ -17,6 +17,12 @@ For LLM features, estimate realistic usage for one active user per month and rea
 - claude-opus-5-5: hard multi-step reasoning, long documents, complex agents
 - claude-fable-5-1: only for rare, high-value, long-horizon work
 
+Think like a product manager: value first, then quality, then cost.
+- customerValue: judge from the paying customer's point of view. Only 2-4 features should score 5 (a reason to buy). Plumbing scores low even if necessary.
+- riskIfWrong: "high" when a wrong output causes legal, financial or safety harm (pay, contracts, compliance, health); these need evals and human review before launch.
+
+The user states the business model. For B2B, the paying customer is the company and users are its employees; for consumer, the user pays.
+
 Keep names short and descriptions to one sentence. Write in English.`;
 
 // Best-effort per-instance limit. Serverless instances don't share memory, so this only slows abuse.
@@ -40,8 +46,11 @@ export async function POST(request: Request) {
   }
 
   let idea = "";
+  let mode = "b2b";
   try {
-    idea = String((await request.json()).idea ?? "").trim();
+    const body = await request.json();
+    idea = String(body.idea ?? "").trim();
+    mode = body.mode === "consumer" ? "consumer" : "b2b";
   } catch {
     return Response.json({ error: "Invalid request." }, { status: 400 });
   }
@@ -59,7 +68,7 @@ export async function POST(request: Request) {
       fallbacks: "default",
       output_config: { effort: "low", format: { type: "json_schema", schema: PLAN_JSON_SCHEMA } },
       system: SYSTEM,
-      messages: [{ role: "user", content: `App idea: ${idea}` }],
+      messages: [{ role: "user", content: `Business model: ${mode === "b2b" ? "B2B SaaS, sold per seat to companies" : "consumer app, freemium"}\n\nApp idea: ${idea}` }],
     });
 
     if (response.stop_reason === "refusal") {

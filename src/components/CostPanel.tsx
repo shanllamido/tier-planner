@@ -1,6 +1,6 @@
 "use client";
 
-import { usd, type Settings, type Summary } from "@/lib/cost";
+import { LABELS, usd, type Settings, type Summary } from "@/lib/cost";
 
 type Props = {
   summary: Summary;
@@ -9,6 +9,7 @@ type Props = {
 };
 
 export function CostPanel({ summary: s, settings, onSettings }: Props) {
+  const L = LABELS[settings.mode];
   const saved = s.naiveMonthlyBill - s.monthlyBill;
   const savedPct = s.naiveMonthlyBill > 0 ? saved / s.naiveMonthlyBill : 0;
   const marginTone = s.premiumMargin < 0 ? "text-rose-600" : s.premiumMarginPct < 0.7 ? "text-amber-600" : "text-emerald-600";
@@ -21,18 +22,18 @@ export function CostPanel({ summary: s, settings, onSettings }: Props) {
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        <Stat label="Free user" value={usd(s.freeUserCost)} />
-        <Stat label="Premium user" value={usd(s.premiumUserCost)} />
-        <Stat label="Premium margin" value={usd(s.premiumMargin)} sub={`${Math.round(s.premiumMarginPct * 100)}% gross`} tone={marginTone} />
+        <Stat label={`${L.free} ${L.user}`} value={usd(s.freeUserCost)} />
+        <Stat label={`${L.premium} ${L.user}`} value={usd(s.premiumUserCost)} sub={`incl. ${L.free}`} />
+        <Stat label={`${L.premium} margin`} value={usd(s.premiumMargin)} sub={`${Math.round(s.premiumMarginPct * 100)}% gross`} tone={marginTone} />
         <Stat
-          label="Premium per 100 free"
+          label={`${L.premium} per 100 ${L.free}`}
           value={s.premiumPerHundredFree === null ? "never" : s.premiumPerHundredFree.toFixed(1)}
-          sub="to cover their LLM cost"
+          sub={`${L.user}s to cover their LLM cost`}
         />
       </div>
 
       <div className="space-y-2 rounded-xl bg-slate-50 p-3">
-        <Row label="Premium price / user / mo">
+        <Row label={L.price}>
           <input
             type="number"
             min={0}
@@ -42,7 +43,7 @@ export function CostPanel({ summary: s, settings, onSettings }: Props) {
             className="w-20 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-right text-xs tabular-nums"
           />
         </Row>
-        <Row label="Monthly active users">
+        <Row label={L.users}>
           <input
             type="number"
             min={0}
@@ -52,11 +53,11 @@ export function CostPanel({ summary: s, settings, onSettings }: Props) {
             className="w-20 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-right text-xs tabular-nums"
           />
         </Row>
-        <Row label={`On premium: ${Math.round(settings.premiumShare * 100)}%`}>
+        <Row label={`${L.share}: ${Math.round(settings.premiumShare * 100)}%`}>
           <input
             type="range"
             min={0}
-            max={0.5}
+            max={settings.mode === "b2b" ? 1 : 0.5}
             step={0.01}
             value={settings.premiumShare}
             onChange={(e) => onSettings({ premiumShare: Number(e.target.value) })}
@@ -73,10 +74,11 @@ export function CostPanel({ summary: s, settings, onSettings }: Props) {
       </div>
 
       <div className="space-y-1 text-xs">
-        <Line label={`${s.freeUsers.toLocaleString()} free + ${s.premiumUsers.toLocaleString()} premium`} value="" />
+        <Line label={`${s.freeUsers.toLocaleString()} ${L.free} + ${s.premiumUsers.toLocaleString()} ${L.premium} ${L.user}s`} value="" />
         <Line label="LLM bill" value={usd(s.monthlyBill)} />
-        <Line label="Premium revenue" value={usd(s.monthlyRevenue)} />
-        <Line label="After LLM costs" value={usd(s.monthlyProfit)} strong tone={s.monthlyProfit < 0 ? "text-rose-600" : "text-emerald-700"} />
+        <Line label={`${L.premium} revenue`} value={usd(s.monthlyRevenue)} />
+        <Line label={`${L.premium} revenue after LLM costs`} value={usd(s.monthlyProfit)} strong tone={s.monthlyProfit < 0 ? "text-rose-600" : "text-emerald-700"} />
+        {settings.mode === "b2b" && <p className="pt-1 text-[10px] text-slate-400">Base licence revenue not included.</p>}
       </div>
 
       {s.naiveMonthlyBill > 0 && (
@@ -95,8 +97,22 @@ export function CostPanel({ summary: s, settings, onSettings }: Props) {
 
       {s.unpricedFeatures > 0 && (
         <p className="text-xs text-slate-500">
-          {s.unpricedFeatures} feature{s.unpricedFeatures === 1 ? "" : "s"} in Free/Premium still need{s.unpricedFeatures === 1 ? "s" : ""} a model.
+          {s.unpricedFeatures} feature{s.unpricedFeatures === 1 ? "" : "s"} in {L.free}/{L.premium} still need{s.unpricedFeatures === 1 ? "s" : ""} a model.
         </p>
+      )}
+
+      {s.evalList.length > 0 && (
+        <div className="rounded-xl border border-rose-100 bg-rose-50/50 p-3 text-xs">
+          <p className="font-semibold text-rose-900">Before launch: evals and human review</p>
+          <ul className="mt-1 space-y-1 text-rose-900/90">
+            {s.evalList.map((f) => (
+              <li key={f.id} title={f.riskNote}>
+                <span className="font-medium">{f.name}</span>
+                <span className="text-rose-700/80"> · {f.riskIfWrong} risk</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {s.warnings.length > 0 && (

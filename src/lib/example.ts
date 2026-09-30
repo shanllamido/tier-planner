@@ -1,7 +1,7 @@
 import type { GeneratedPlan } from "./schema";
 
 export const EXAMPLE_IDEA =
-  "An AI assistant for staffing agencies that helps dispatchers fill customer orders with temp workers, checks pay rules from collective agreements, and drafts offers to workers.";
+  "Staffing agencies pay for this. Today their dispatchers lose hours a day filling customer orders by phone and checking pay rules from collective agreements by hand, and mistakes mean fines or back-pay. An AI assistant reads incoming orders, suggests suitable temp workers, checks the pay rules and drafts the offers, with the dispatcher approving each step.";
 
 // Hand-written example so the board works without an API call.
 export const EXAMPLE_PLAN: GeneratedPlan = {
@@ -18,6 +18,10 @@ export const EXAMPLE_PLAN: GeneratedPlan = {
       batchable: false,
       suggestedModel: "claude-haiku-4-5",
       rationale: "Pure extraction into fixed fields; Haiku is accurate and cheap enough.",
+      customerValue: 4,
+      valueReason: "Saves dispatchers ~5 minutes per order and no order gets lost in the inbox.",
+      riskIfWrong: "medium",
+      riskNote: "A wrong start date or headcount means an unfilled shift; dispatcher confirms before saving.",
     },
     {
       name: "Worker matching",
@@ -30,6 +34,10 @@ export const EXAMPLE_PLAN: GeneratedPlan = {
       batchable: false,
       suggestedModel: "none",
       rationale: "Filters and scoring over database fields; no language needed.",
+      customerValue: 5,
+      valueReason: "Fills shifts faster: the core job the agency is paid for.",
+      riskIfWrong: "medium",
+      riskNote: "A bad match wastes a placement; rules are tested code and the dispatcher picks.",
     },
     {
       name: "Pay rule calculator",
@@ -42,6 +50,10 @@ export const EXAMPLE_PLAN: GeneratedPlan = {
       batchable: false,
       suggestedModel: "none",
       rationale: "Fixed legal rules belong in tested code, not in a model.",
+      customerValue: 5,
+      valueReason: "Avoids underpaying workers, which risks fines and back-payments.",
+      riskIfWrong: "high",
+      riskNote: "Wrong pay breaks the law; keep it as tested rules, never an LLM guess.",
     },
     {
       name: "Ask the agreement",
@@ -54,6 +66,10 @@ export const EXAMPLE_PLAN: GeneratedPlan = {
       batchable: false,
       suggestedModel: "claude-sonnet-5-5",
       rationale: "Needs careful reading of long legal text with citations; the agreement text caches well.",
+      customerValue: 4,
+      valueReason: "Answers compliance questions in seconds instead of calling the legal team.",
+      riskIfWrong: "high",
+      riskNote: "A wrong legal answer can cause underpayment; always cite the passage and eval on real questions.",
     },
     {
       name: "Explain a warning",
@@ -66,6 +82,10 @@ export const EXAMPLE_PLAN: GeneratedPlan = {
       batchable: false,
       suggestedModel: "claude-haiku-4-5",
       rationale: "Short explanation of an already-computed rule.",
+      customerValue: 3,
+      valueReason: "Dispatchers understand and fix flags without training.",
+      riskIfWrong: "medium",
+      riskNote: "A misleading explanation could hide a real issue; the rule itself stays in code.",
     },
     {
       name: "Offer drafting",
@@ -78,6 +98,10 @@ export const EXAMPLE_PLAN: GeneratedPlan = {
       batchable: false,
       suggestedModel: "claude-haiku-4-5",
       rationale: "Short templated writing; tone matters more than reasoning.",
+      customerValue: 4,
+      valueReason: "Workers get offers minutes after an order, before competitors call them.",
+      riskIfWrong: "medium",
+      riskNote: "A wrong shift time in an offer causes no-shows; fill facts from data, let the LLM write only the wording.",
     },
     {
       name: "Shift planning agent",
@@ -90,6 +114,10 @@ export const EXAMPLE_PLAN: GeneratedPlan = {
       batchable: false,
       suggestedModel: "claude-opus-5-5",
       rationale: "Multi-step planning with many constraints; worth the stronger model.",
+      customerValue: 5,
+      valueReason: "Plans a week of shifts in minutes instead of hours.",
+      riskIfWrong: "high",
+      riskNote: "A bad plan breaks working-time law or leaves shifts empty; human approves every plan.",
     },
     {
       name: "Weekly customer report",
@@ -102,6 +130,10 @@ export const EXAMPLE_PLAN: GeneratedPlan = {
       batchable: true,
       suggestedModel: "claude-sonnet-5-5",
       rationale: "Summarising numbers into prose; nobody needs it instantly, so batch it.",
+      customerValue: 2,
+      valueReason: "Nice for account managers, but customers rarely buy for it.",
+      riskIfWrong: "low",
+      riskNote: "A clumsy summary is embarrassing, not harmful; numbers come from the database.",
     },
     {
       name: "Timesheet anomaly check",
@@ -114,6 +146,10 @@ export const EXAMPLE_PLAN: GeneratedPlan = {
       batchable: false,
       suggestedModel: "none",
       rationale: "Threshold rules catch these reliably.",
+      customerValue: 4,
+      valueReason: "Catches payroll errors before they cost money.",
+      riskIfWrong: "medium",
+      riskNote: "Missed anomalies reach payroll; tune thresholds with past data.",
     },
     {
       name: "Candidate CV parsing",
@@ -126,6 +162,10 @@ export const EXAMPLE_PLAN: GeneratedPlan = {
       batchable: true,
       suggestedModel: "claude-haiku-4-5",
       rationale: "Structured extraction; can run in the background overnight.",
+      customerValue: 3,
+      valueReason: "Profiles are complete without manual typing.",
+      riskIfWrong: "low",
+      riskNote: "A missed skill costs a match; the worker confirms their profile.",
     },
     {
       name: "Dashboard & KPIs",
@@ -138,6 +178,10 @@ export const EXAMPLE_PLAN: GeneratedPlan = {
       batchable: false,
       suggestedModel: "none",
       rationale: "Database queries and charts.",
+      customerValue: 3,
+      valueReason: "Managers see fill rate and margin at a glance.",
+      riskIfWrong: "low",
+      riskNote: "Plain queries; test them like any report.",
     },
     {
       name: "Dispatcher chat assistant",
@@ -150,6 +194,10 @@ export const EXAMPLE_PLAN: GeneratedPlan = {
       batchable: false,
       suggestedModel: "claude-sonnet-5-5",
       rationale: "Tool-using agent with frequent use; Sonnet balances quality and cost.",
+      customerValue: 2,
+      valueReason: "Handy, but overlaps with the focused features above.",
+      riskIfWrong: "medium",
+      riskNote: "Open-ended chat can take wrong actions; limit tools and require confirmation.",
     },
   ],
 };
