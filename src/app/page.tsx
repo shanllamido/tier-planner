@@ -7,7 +7,7 @@ export default function Home() {
         <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">AI product planning</p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">Tier Planner</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600">
-          Decide what to build and how to sell it: <b>value first, then quality, then cost.</b> Describe an AI product, sort its features into
+          Decide what to build and how to sell it: <b>value first, then quality, then cost.</b> Start from a product brief, sort its features into
           plans, and pick a Claude model for each. You see which features customers would pay for, which need evals before launch, and whether
           the plan pays off.
         </p>

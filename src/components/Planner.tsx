@@ -18,14 +18,13 @@ import {
 } from "@dnd-kit/core";
 import { useEffect, useMemo, useState } from "react";
 import { DEFAULT_SETTINGS, LABELS, MODE_DEFAULTS, summarize, usd, type Feature, type Mode, type Settings, type Tier } from "@/lib/cost";
-import { EXAMPLE_IDEA, EXAMPLE_PLAN } from "@/lib/example";
+import { EXAMPLE_BRIEF, EXAMPLE_PLAN } from "@/lib/example";
 import { MODELS, MODEL_BY_ID, PRICES_CHECKED, type ModelId, type ModelInfo } from "@/lib/models";
 import type { GeneratedPlan } from "@/lib/schema";
 import { CostPanel } from "./CostPanel";
 import { FeatureCard } from "./FeatureCard";
 import { ValueMatrix } from "./ValueMatrix";
 
-type Meta = { model: string; inputTokens: number; outputTokens: number; costUsd: number; ms: number };
 
 const STORAGE_KEY = "tier-planner:v2";
 
@@ -48,7 +47,7 @@ function toFeatures(plan: GeneratedPlan): Feature[] {
   }));
 }
 
-type Saved = { idea?: string; appName?: string; features?: Feature[]; settings?: Partial<Settings>; meta?: Meta | null };
+type Saved = { appName?: string; features?: Feature[]; settings?: Partial<Settings> };
 
 // Planner renders client-only (see ClientPlanner), so localStorage is available here.
 function readSaved(): Saved | null {
@@ -73,20 +72,16 @@ const collision: CollisionDetection = (args) => {
 
 export function Planner() {
   const [saved] = useState(readSaved);
-  const [idea, setIdea] = useState<string>(saved?.idea ?? "");
-  const [appName, setAppName] = useState<string>(saved?.appName ?? "");
-  const [features, setFeatures] = useState<Feature[]>(saved?.features ?? []);
+  const [appName, setAppName] = useState<string>(saved?.appName ?? EXAMPLE_PLAN.appName);
+  const [features, setFeatures] = useState<Feature[]>(() => saved?.features ?? toFeatures(EXAMPLE_PLAN));
   const [settings, setSettings] = useState<Settings>({ ...DEFAULT_SETTINGS, ...saved?.settings });
-  const [meta, setMeta] = useState<Meta | null>(saved?.meta ?? null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [active, setActive] = useState<{ kind: "feature"; id: string } | { kind: "model"; id: ModelId } | null>(null);
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ idea, appName, features, settings, meta }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ appName, features, settings }));
     } catch {}
-  }, [idea, appName, features, settings, meta]);
+  }, [appName, features, settings]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -115,38 +110,14 @@ export function Planner() {
     if (a.kind === "model" && o.accepts === "model") update(o.featureId, { model: a.modelId });
   }
 
-  async function generate() {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idea, mode: settings.mode }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Something went wrong.");
-      setAppName(data.plan.appName);
-      setFeatures(toFeatures(data.plan));
-      setMeta(data.meta);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   function setMode(mode: Mode) {
     setSettings((s) => ({ ...s, mode, ...MODE_DEFAULTS[mode] }));
   }
 
   function loadExample() {
     setMode("b2b");
-    setIdea(EXAMPLE_IDEA);
     setAppName(EXAMPLE_PLAN.appName);
     setFeatures(toFeatures(EXAMPLE_PLAN));
-    setMeta(null);
-    setError(null);
   }
 
   function applySuggestions() {
@@ -185,7 +156,7 @@ export function Planner() {
       {/* Step 1 */}
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <StepLabel n={1} text="Describe the customer, their problem and the product" />
+          <StepLabel n={1} text="The customer, their problem and the product" />
           <div role="radiogroup" aria-label="Business model" className="flex rounded-lg bg-slate-100 p-0.5 text-xs font-medium">
             {(["b2b", "consumer"] as const).map((m) => (
               <button
@@ -201,44 +172,26 @@ export function Planner() {
             ))}
           </div>
         </div>
-        <p className="mt-1 text-xs text-slate-500">
-          Good input names <b>who pays</b>, <b>the problem they have today</b> and <b>what the product changes</b>. Claude scores each feature for
-          customer value and risk, not just cost.
-        </p>
-        <textarea
-          value={idea}
-          onChange={(e) => setIdea(e.target.value)}
-          maxLength={600}
-          rows={3}
-          placeholder="e.g. Staffing agencies (who pays) lose hours every day matching temp workers to customer orders by phone and checking pay rules by hand (problem). An AI assistant that reads orders, suggests workers and drafts offers (product)."
-          className="mt-2 w-full resize-y rounded-xl border border-slate-200 bg-slate-50/50 p-3 text-sm outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
-        />
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={generate}
-            disabled={loading || idea.trim().length < 10}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {loading ? "Claude is planning…" : "Generate features"}
-          </button>
+        <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
+          {EXAMPLE_BRIEF.map((b) => (
+            <div key={b.label} className="rounded-xl bg-slate-50 p-3">
+              <dt className="text-[11px] font-semibold uppercase tracking-wide text-indigo-600">{b.label}</dt>
+              <dd className="mt-1 leading-relaxed text-slate-700">{b.text}</dd>
+            </div>
+          ))}
+        </dl>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
           <button
             type="button"
             onClick={loadExample}
             className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
           >
-            Load example (no API call)
+            Reset the board
           </button>
-          <span className="text-xs text-slate-500">{idea.length}/600</span>
+          <span className="text-xs text-slate-500">
+            Features were drafted by Claude from this brief. They include value, risk and usage estimates; edit any of them under &ldquo;Details&rdquo;.
+          </span>
         </div>
-        {error && <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800">{error}</p>}
-        {meta && (
-          <p className="mt-2 text-xs text-slate-500">
-            Generated by <b>{MODEL_BY_ID[meta.model as ModelId]?.name ?? meta.model}</b> (low effort, structured output) ·{" "}
-            {meta.inputTokens.toLocaleString()} in / {meta.outputTokens.toLocaleString()} out tokens · <b>{usd(meta.costUsd)}</b> ·{" "}
-            {(meta.ms / 1000).toFixed(1)}s. That was the only LLM call; everything below is maths in your browser.
-          </p>
-        )}
       </section>
 
       {features.length > 0 && (
@@ -306,7 +259,7 @@ export function Planner() {
       )}
 
       {features.length === 0 && (
-        <p className="mt-6 text-center text-sm text-slate-500">Generate a feature list or load the example to start planning.</p>
+        <p className="mt-6 text-center text-sm text-slate-500">The board is empty. Use &ldquo;Reset the board&rdquo; to start again.</p>
       )}
 
       <HowItWorks />
@@ -408,8 +361,9 @@ function HowItWorks() {
           pricing covers, with caching and batching where they fit.
         </Principle>
         <Principle n="4" title="How this tool works">
-          One call to Claude Opus 5.5 at low effort drafts the features, using a JSON schema (structured outputs), a frozen system prompt that can
-          be cached, and server-side fallback. Everything after that is plain code in your browser. Prices checked {PRICES_CHECKED}.
+          The feature list was drafted by one call to Claude Opus 5.5 at low effort, with a JSON schema (structured outputs) and a frozen,
+          cacheable system prompt. That call cost about 7 cents. Everything on this page is plain code in your browser, so using it costs nothing.
+          Prices checked {PRICES_CHECKED}.
         </Principle>
       </div>
     </section>

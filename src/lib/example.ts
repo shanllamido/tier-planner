@@ -1,7 +1,16 @@
 import type { GeneratedPlan } from "./schema";
 
-export const EXAMPLE_IDEA =
-  "Staffing agencies pay for this. Today their dispatchers lose hours a day filling customer orders by phone and checking pay rules from collective agreements by hand, and mistakes mean fines or back-pay. An AI assistant reads incoming orders, suggests suitable temp workers, checks the pay rules and drafts the offers, with the dispatcher approving each step.";
+export const EXAMPLE_BRIEF = [
+  { label: "Who pays", text: "Staffing agencies, per dispatcher seat, as an add-on to their staffing software." },
+  {
+    label: "The problem today",
+    text: "Dispatchers lose hours a day filling customer orders by phone and checking pay rules from collective agreements by hand. Mistakes mean fines or back-pay.",
+  },
+  {
+    label: "What the product changes",
+    text: "An AI assistant reads incoming orders, suggests suitable temp workers, checks the pay rules and drafts offers. The dispatcher approves each step.",
+  },
+];
 
 // Hand-written example so the board works without an API call.
 export const EXAMPLE_PLAN: GeneratedPlan = {
